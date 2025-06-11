@@ -47,7 +47,7 @@ ax.add_patch(a2)
 
 # plots texts
 size = 'x-large'
-plt.text(-0.22, 0, "$O_P$", fontsize=size)
+plt.text(-0.22, 0, r"$\mathcal{O}_P$", fontsize=size)
 plt.text(endx + 0.5, 0.1, "$y$", fontsize=size)
 plt.text(endx - 0.05, 0.1, "$y_0$", fontsize=size)
 plt.text(-0.15, endy + 0.5, "$z$", fontsize=size)
@@ -56,7 +56,7 @@ plt.text(-1.2, -1.05, "$x$", fontsize=size)
 plt.text(-0.95, -0.75, "$x_0$", fontsize=size)
 plt.text(0.05, -0.3, "$\phi_0$", fontsize=size)
 plt.text(0.1, 0.2, "$\\theta_0$", fontsize=size)
-plt.text(endx - 0.65, endy - 0.9, "$O_B$", fontsize=size)
+plt.text(endx - 0.65, endy - 0.9, r"$\mathcal{O}_B$", fontsize=size)
 plt.text(0.9, -0.45, "$\\rho_0$", fontsize=size)
 plt.text(endx - 1.55, endy - 1.4, "$u$", fontsize=size)
 plt.text(endx + 0.25, endy - 0.65, "$v$", fontsize=size)
@@ -66,4 +66,4 @@ plt.text(0.9, 0.45, "$r_0$", fontsize=size)
 
 plt.axis('equal')
 plt.axis('off')
-plt.savefig('FigCoordinates', dpi=800)
+plt.savefig('sistema_coordenadas', dpi=800)
