@@ -13,7 +13,7 @@ omega = k * c
 K = 2 * k
 Zmax = 30 * BigFloat(10^-6)
 z0 = 0
-Q = 0.9 * k
+Q = 0.85 * k
 E0 = 1
 mult_factor = BigFloat("1e+24")
 
@@ -180,19 +180,39 @@ z0 = 0
 fig = Figure(figure_padding=40, size= 3 .*(500, 200), fontsize = 25)
 ax1 = Axis(fig[1, 1], title = "(a)",
     xlabel = L"z \, (\mu m)", ylabel = L"Magnitude", aspect=1.5)
-ax2 = Axis(fig[1, 2], title = "(b)",
+ax2 = Axis(fig[1, 2], title = "(b)", yticklabelsvisible=false, yticksvisible=false,
     xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.5)
+ax_inset = Axis(fig[1, 1],
+    width=Relative(0.2),
+    height=Relative(0.2),
+    halign=0.05, valign=0.85,
+    xticklabelsvisible=false, yticklabelsvisible=false, yticksvisible=false,
+    ylabelvisible=false, xticksvisible=false)
+
+function FW(r, z)
+    sum_mackinnon = 0 + 0im
+    for n in range(lmin, lmax)
+        sum_mackinnon += F(- n * pi / k) * sinc(1/pi * sqrt((k * r)^2 + (z * k + pi * n)^2))
+    end
+    return sum_mackinnon
+end
+
+function S(x)
+    return 1/K * reduce(+, Fterms .* exp.(1im * 2 * pi * range(lmin,lmax) * x / K))
+end
 
 Fplot = abs2.(F.(zvalues))
+intensityFW = [abs2(FW(0, z)) for z in zvalues]
+spectra = [abs2(S(x)) for x in range(-k,k,tam)]
 
 zvalues *= 10^6
 
-lines!(ax1, zvalues, Fplot, color="blue")
-lines!(ax2, zvalues, Fzvalues, color="blue")
-#lines!(ax2, zvalues, Fzvalues, color="black")
+lines!(ax1, zvalues, Fplot, color="black", label=L"|F(z)|^2")
+lines!(ax1, zvalues, intensityFW, color="blue", label=L"|\Psi(0,z)|^2", linestyle=:dash)
+lines!(ax_inset, zvalues, spectra, color="black")
+lines!(ax2, zvalues, Fzvalues, color="black")
 
-#axislegend(ax1, position=:rt)
-#axislegend(ax2, position=:rt)
+axislegend(ax1, position=:rt)
 
 #colgap!(fig.layout, Relative(0.1))
 #rowgap!(fig.layout, 2, 10)
