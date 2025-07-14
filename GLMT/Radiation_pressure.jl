@@ -1,29 +1,36 @@
-using WGLMakie, ColorSchemes, ColorTypes, JLD2, FiniteDifferences
-using MakieThemes, SpecialFunctions, Interpolations, Integrals, HypergeometricFunctions, AssociatedLegendrePolynomials
+using GLMakie, ColorSchemes, ColorTypes, JLD2, FiniteDifferences, Base.Threads, Arblib
+using MakieThemes, SpecialFunctions, HypergeometricFunctions, AssociatedLegendrePolynomials
 
-lambda = 1064 * 10^-9
-c = 299792458
-omega = 2 * pi * c / lambda
-k = omega / c
+setprecision(256)
+Arblib.setprecision(256)
+
+lambda = BigFloat("1064e-9")
+mu = 4 * big(pi) * BigFloat("1e-7")
+epsilon = 885418782 * BigFloat("1e-20")
+c = BigFloat(1 / sqrt(mu * epsilon))
+k = 2 * big(pi) / lambda
+omega = k * c
 K = 2 * k
-Zmax = 22 * 10^-6
-pmax = 500
-nmax = 47
-global z0 = 0
+Zmax = 30 * BigFloat(10^-6)
+z0 = 0
 Q = 0.9 * k
 E0 = 1
+mult_factor = BigFloat("1e+24")
 
-mu = 1.256 * 10^-6
-musp = mu
-M = 1.59
-d = 10^-6
-alpha = pi * d / lambda
+global z0 = BigFloat(0)
+
+pmax = 500
+nmax = 47
+tam = 500
+
+M = 1.2
+d = 10^-9
+alpha = big(pi) * d / lambda
 betah = M * alpha
+musp = mu
 
 lmax = Int(round(Zmax * k / pi, RoundUp))
 lmin = Int(round(-Zmax * k / pi, RoundDown))
-
-tam = 24
 
 function load_B_values(filename::String)
     @load filename B1_vals B2_vals B3_vals B4_vals
@@ -33,54 +40,75 @@ end
 # Loads stored B values
 B1_data, B2_data, B3_data, B4_data = load_B_values("./GLMT/Bvalues.jld2")
 
-@inline function F(z)
-    term1 = 1 # exp(- 1im * Q * z)
+function F(z)
+    term1 = exp(1im * Q * z)
     term2 = exp(- 8 * (z/Zmax)^2)
     return term1 * term2
 end
 
-Fterms = F.(pi .* range(lmin,lmax) ./ k)
+Fterms = F.(- big(pi) .* range(lmin,lmax) ./ k)
 
+function custom_sinint(x)
+    x_arb = Arb(x)
+    si = sinint(x_arb)
+    return BigFloat(si)
+end
+
+sinint_table = []
 function gTM(n, m)
-    term1 = - (1.0im)^m / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(n-m+1) - loggamma(n + abs(m) + 1)) # uses log to prevent overflow with big factorials
-    term2 = 0
+    term1 = - (1.0im)^m / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
+    term2 = BigFloat(0)
     for p in range(-pmax,pmax)
-        term3 = 0
+        term3 = BigFloat(0)
         for l in range(lmin, lmax)
-            term3 += Fterms[l - lmin + 1] * sinint(pi * (l + p) + k * z0)
+            term3 += Fterms[l - lmin + 1] * sinint_table[l - lmin + p + pmax + 1]
         end
-        term2 += (B1_data[(n, p)] * (m + 1) + B2_data[(n, p)] * (1 - m))/2 * term3
+        term2 += (B1_data[n, p + pmax + 1] * (m + 1) + B2_data[n, p + pmax + 1] * (1 - m))/2 * term3
     end
     return term1 * term2
 end
 
 function gTE(n, m)
-    term1 = (1.0im)^(m + 1) / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(n-m+1) - loggamma(n + abs(m) + 1)) # uses log to prevent overflow with big factorials
+    term1 = (1.0im)^(m + 1) / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
     term2 = 0
     for p in range(-pmax,pmax)
         term3 = 0
         for l in range(lmin, lmax)
-            term3 += Fterms[l - lmin + 1] * sinint(pi * (l + p) + k * z0)
+            term3 += Fterms[l - lmin + 1] * sinint_table[l - lmin + p + pmax + 1]
         end
-        term2 += (B3_data[(n, p)] * (m + 1) - B4_data[(n, p)] * (1 - m))/2 * term3
+        term2 += (B3_data[n, p + pmax + 1] * (m + 1) - B4_data[n, p + pmax + 1] * (1 - m))/2 * term3
     end
     return term1 * term2
 end
 
+function custom_besselj(n, x)
+    n_acb = Acb(n + 0.5)
+    x_acb = Acb(x)
+    bess = besselj(n_acb, x_acb)
+    result = sqrt(big(pi) / (2 * x)) * Complex{BigFloat}(bess)
+    return result
+end
+
+function custom_hankel2(n, x)
+    n_acb = Acb(n + 0.5)
+    x_acb = Acb(x)
+    hank = besselh(n_acb, 2, x_acb)
+    result = sqrt(big(pi) / (2 * x)) * Complex{BigFloat}(hank)
+    return result
+end
+
 function ricatti_besselj(n, x)
-    return x * sphericalbesselj(n, x)
+    return x * custom_besselj(n, x)
 end
 
 function dricatti_besselj(n, x)
-    return forward_fdm(5,1)(x1 -> ricatti_besselj(n, x1), x)
-end
-
-function sphericalhankel(n, x)
-    return sqrt(pi / (2 * x)) * hankelh2(n + 0.5, x)
+    #return forward_fdm(5,1)(x1 -> ricatti_besselj(n, x1), x)
+    return - n * custom_besselj(n, x) + x * custom_besselj(n-1, x)
+    #return (n + 1) * custom_besselj(n, x) - x * custom_besselj(n-1, x)
 end
 
 function ricatti_besselh(n, x)
-    return x * sphericalhankel(n, x)
+    return x * custom_hankel2(n, x)
 end
 
 function dricatti_besselh(n, x)
@@ -96,10 +124,10 @@ function an(n)
 end
 
 function bn(n)
-    term1 = mu * ricatti_besselj(n, alpha) * dricatti_besselj(n, betah) - 
-        musp * M * ricatti_besselj(n, betah) * dricatti_besselj(n, alpha)
-    term2 = mu * ricatti_besselh(n, alpha) * dricatti_besselj(n, betah)- 
-        musp * M * ricatti_besselj(n, betah) * dricatti_besselh(n, alpha)
+    term1 = mu * M * ricatti_besselj(n, alpha) * dricatti_besselj(n, betah) - 
+        musp * ricatti_besselj(n, betah) * dricatti_besselj(n, alpha)
+    term2 = mu * M * ricatti_besselh(n, alpha) * dricatti_besselj(n, betah) - 
+        musp * ricatti_besselj(n, betah) * dricatti_besselh(n, alpha)
     return term1 / term2
 end
 
@@ -108,18 +136,18 @@ anterms = an.(nterms)
 bnterms = bn.(nterms)
 
 function Cpr_z()
-    C = 0.0
+    C = BigFloat(0)
 
-    for n in 1:(nmax-1)
+    Threads.@threads for n in 1:5
         for p in (-1,1) # the only valid ones
             abs_p = abs(p)
 
             # Factorial prefactor
-            B = exp(loggamma(n + abs_p + 1) - loggamma(n - abs_p + 1))
+            B = exp(loggamma(BigFloat(n + abs_p + 1)) - loggamma(BigFloat(n - abs_p + 1)))
             A = B * (n + 1 + abs_p)
 
             # precalculates relevant LMT coefficients
-            const_a = anterms[n+1]
+            const_a = anterms[n]
             const_a1 = anterms[n+1]
             const_b = bnterms[n]
             const_b1 = bnterms[n+1]
@@ -132,18 +160,18 @@ function Cpr_z()
 
             # First Term
             T1_factor = 1 / (n + 1)^2 * A
-            T1_real = real((const_a + conj(const_a1) - 2const_a * conj(const_a1)) * gtma * conj(gtma1) +
-                (const_b + conj(const_b1) - 2const_b * conj(const_b1)) * gtea * conj(gtea1))
+            T1_real = real((const_a + conj(const_a1) - 2 * const_a * conj(const_a1)) * gtma * conj(gtma1) +
+                (const_b + conj(const_b1) - 2 * const_b * conj(const_b1)) * gtea * conj(gtea1))
 
             # Second Term
-            T2_factor = p * (2n + 1) / (n^2 * (n + 1)^2) * B
-            T2_real = real(1im * (2const_a * conj(const_b) - const_a - conj(const_b)) * gtma * conj(gtea))
+            T2_factor = p * BigFloat(2n + 1) / BigFloat(n^2 * (n + 1)^2) * B
+            T2_real = real(1im * (2 * const_a * conj(const_b) - const_a - conj(const_b)) * gtma * conj(gtea))
 
             C += T1_factor * T1_real + T2_factor * T2_real
         end
     end
 
-    return lambda^2 / pi * C
+    return C * lambda^2 / big(pi) * mult_factor
 end
 
 zvalues = LinRange(-Zmax, Zmax, tam)
@@ -153,6 +181,7 @@ Cvalues = []
 global count = 0
 for z in zvalues
     global z0 = z
+    global sinint_table = [custom_sinint(big(pi) * term + k * z0) for term in (-pmax+lmin):(pmax+lmax)]
     push!(Cvalues, Cpr_z())
     if count % 10 == 0
         println(count, " pontos calculados")
@@ -166,7 +195,7 @@ fig = Figure(figure_padding=40, size= 3 .*(500, 200), fontsize = 25)
 ax1 = Axis(fig[1, 1], title = "(a)",
     xlabel = L"z \, (\mu m)", ylabel = L"Magnitude", aspect=1.5)
 ax2 = Axis(fig[1, 2], title = "(b)",
-    xlabel = L"z_0 \, (\mu m)", ylabel = L"C_{pr,z} \, (m^2)", aspect=1.5)
+    xlabel = L"z_0 \, (\mu m)", ylabel = L"C_{pr,z} \, (pm^2)", aspect=1.5)
 
 Fplot = abs2.(F.(zvalues))
 
