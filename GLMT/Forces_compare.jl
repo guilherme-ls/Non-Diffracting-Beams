@@ -13,8 +13,8 @@ omega = k * c
 K = 2 * k
 z0 = 0
 Q = 0.85 * k
-E0 = 1
 eta_var = sqrt(mu / epsilon)
+E0 = sqrt(2 * eta_var)
 mult_factor = BigFloat("1e+24")
 
 M = 1.2
@@ -56,6 +56,10 @@ end
 
 sinint_table = []
 function gTM(n, m)
+    if abs(m) != 1
+        return 0
+    end
+
     term1 = - (1.0im)^m / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
     term2 = BigFloat(0)
     for p in range(-pmax,pmax)
@@ -69,6 +73,10 @@ function gTM(n, m)
 end
 
 function gTE(n, m)
+    if abs(m) != 1
+        return 0
+    end
+
     term1 = (1.0im)^(m + 1) / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
     term2 = 0
     for p in range(-pmax,pmax)
@@ -171,7 +179,7 @@ function Cpr_z()
         end
     end
 
-    return C * lambda^2 / big(pi) * mult_factor
+    return C * lambda^2 / (2 * big(pi)) * mult_factor
 end
 
 function g(z)
@@ -237,14 +245,14 @@ function Fz_dipole(r, z, phi)
 end
 
 @inline function G_factor()
-    term1 = (1/3) * gTM(1, 0) * conj(gTM(2, 0))
+    term1 = 0#(1/3) * gTM(1, 0) * conj(gTM(2, 0))
     term2 = gTM(1, 1) * (conj(gTM(2, 1)) - 1im * conj(gTE(1, 1)))
     term3 = gTM(1, -1) * (conj(gTM(2, -1)) + 1im * conj(gTE(1, -1)))
     return term1 + term2 + term3
 end
 
 @inline function Fz_GLMT()
-    term1 = 3 * lambda^2 / (2 * big(pi))
+    term1 = 3 * lambda^2 / (4 * big(pi))
     term2 = real(a_mie * G_factor())
     return term1 * term2 * mult_factor
 end
@@ -298,12 +306,15 @@ println("FW calculated")
 # plots
 fig = Figure(figure_padding=40, size= 3 .*(800, 200), fontsize = 25)
 ax1 = Axis(fig[1, 1], title = "(a)", xlabel = L"z \, (\mu m)", ylabel = L"Magnitude", aspect=1.3)
-ax2 = Axis(fig[1, 2], title = "(b)", yticklabelsvisible=false, yticksvisible=false,
-    xgridvisible = false, ygridvisible = false, xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.3)
-ax3 = Axis(fig[1, 3], title = "(c)", yticklabelsvisible=false, yticksvisible=false,
-    xgridvisible = false, ygridvisible = false, ylabelvisible=false, xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.3)
-ax4 = Axis(fig[1, 4], title = "(d)", yticklabelsvisible=false, yticksvisible=false,
-    xgridvisible = false, ygridvisible = false, ylabelvisible=false, xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.3)
+ax2 = Axis(fig[1, 2], title = "(b)",
+#    yticklabelsvisible=false, yticksvisible=false, xgridvisible = false, ygridvisible = false,
+    xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.3)
+ax3 = Axis(fig[1, 3], title = "(c)", 
+    yticklabelsvisible=false, yticksvisible=false, ylabelvisible=false, 
+    xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.3)
+ax4 = Axis(fig[1, 4], title = "(d)",
+    yticklabelsvisible=false, yticksvisible=false, ylabelvisible=false,
+    xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.3)
 
 ax_inset = Axis(fig[1, 1],
     width=Relative(0.2),
@@ -314,6 +325,9 @@ ax_inset = Axis(fig[1, 1],
 
 Fplot = abs2.(F.(zvalues))
 zvalues *= 10^6
+
+linkyaxes!(ax2, ax3)
+linkyaxes!(ax3, ax4)
 
 lines!(ax1, zvalues, Fplot, color="black", label=L"|F(z)|^2")
 lines!(ax1, zvalues, intensityFW, color="blue", label=L"|\Psi(0,z)|^2", linestyle=:dash)

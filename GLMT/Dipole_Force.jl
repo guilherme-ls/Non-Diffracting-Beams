@@ -14,8 +14,8 @@ K = 2 * k
 Zmax = 30 * BigFloat(10^-6)
 z0 = 0
 Q = 0.85 * k
-E0 = 1
 eta_var = sqrt(mu / epsilon)
+E0 = sqrt(2 * eta_var)
 mult_factor = BigFloat("1e+24")
 
 nmax = Int(round((Zmax + z0) * k / pi, RoundUp))
@@ -26,9 +26,7 @@ tam = 500
 # calculo para a << lambda
 #np = BigFloat(1.2)
 #size = k * BigFloat(10^-9)
-# errado a partir daqui, faltando algo
 #alpha_var = (np^2 - 1) / (np^2 + 2) * size^3 / k^3 - 1im * 2 / 3 * ((np^2 - 1) / (np^2 + 2))^2 * size^6 / k^3
-
 
 M = 1.2
 d = 10^-9
@@ -162,7 +160,7 @@ end
 fig = Figure(figure_padding=40, size= 3 .*(500, 200), fontsize = 25)
 ax1 = Axis(fig[1, 1], title = "(a)",
     xlabel = L"z \, (\mu m)", ylabel = L"Magnitude", aspect=1.5)
-ax2 = Axis(fig[1, 2], title = "(b)", yticklabelsvisible=false, yticksvisible=false,
+ax2 = Axis(fig[1, 2], title = "(b)",
     xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.5)
 ax_inset = Axis(fig[1, 1],
     width=Relative(0.2),

@@ -56,6 +56,10 @@ end
 
 sinint_table = []
 function gTM(n, m)
+    if abs(m) != 1
+        return 0
+    end
+
     term1 = - (1.0im)^m / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
     term2 = BigFloat(0)
     for p in range(-pmax,pmax)
@@ -69,6 +73,10 @@ function gTM(n, m)
 end
 
 function gTE(n, m)
+    if abs(m) != 1
+        return 0
+    end
+
     term1 = (1.0im)^(m + 1) / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
     term2 = 0
     for p in range(-pmax,pmax)
@@ -104,7 +112,6 @@ end
 function dricatti_besselj(n, x)
     #return forward_fdm(5,1)(x1 -> ricatti_besselj(n, x1), x)
     return - n * custom_besselj(n, x) + x * custom_besselj(n-1, x)
-    #return (n + 1) * custom_besselj(n, x) - x * custom_besselj(n-1, x)
 end
 
 function ricatti_besselh(n, x)
@@ -171,7 +178,7 @@ function Cpr_z()
         end
     end
 
-    return C * lambda^2 / big(pi) * mult_factor
+    return C * lambda^2 / (2 * big(pi)) * mult_factor
 end
 
 zvalues = LinRange(-Zmax, Zmax, tam)
@@ -194,7 +201,7 @@ z0 = 0
 fig = Figure(figure_padding=40, size= 3 .*(500, 200), fontsize = 25)
 ax1 = Axis(fig[1, 1], title = "(a)",
     xlabel = L"z \, (\mu m)", ylabel = L"Magnitude", aspect=1.5)
-ax2 = Axis(fig[1, 2], title = "(b)", yticklabelsvisible=false, yticksvisible=false,
+ax2 = Axis(fig[1, 2], title = "(b)",
     xlabel = L"z_0 \, (\mu m)", ylabel = L"C_{pr,z} \, (pm^2)", aspect=1.5)
 ax_inset = Axis(fig[1, 1],
     width=Relative(0.2),

@@ -98,18 +98,10 @@ function custom_sinint(x)
     return BigFloat(si)
 end
 
-prev_z0 = Inf
 sinint_table = Array{BigFloat}(undef, 2 * pmax - lmin + lmax + 1)
 function gTM(n, m)
     if abs(m) != 1
         return 0
-    end
-
-    if prev_z0 != z0
-        global prev_z0 = z0
-        Threads.@threads for term in (-pmax+lmin):(pmax+lmax)
-            global sinint_table[term - lmin + pmax + 1] = custom_sinint(big(pi) * term + k * z0)
-        end
     end
 
     term1 = - (1.0im)^m / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
@@ -127,13 +119,6 @@ end
 function gTE(n, m)
     if abs(m) != 1
         return 0
-    end
-
-    if prev_z0 != z0
-        global prev_z0 = z0
-        Threads.@threads for term in (-pmax+lmin):(pmax+lmax)
-            global sinint_table[term - lmin + pmax + 1] = custom_sinint(big(pi) * term + k * z0)
-        end
     end
 
     term1 = (1.0im)^(m + 1) / 2 * (-1.0)^((m - abs(m))/2) * exp(loggamma(BigFloat(n-m+1)) - loggamma(BigFloat(n + abs(m) + 1))) # uses log to prevent overflow with big factorials
@@ -156,7 +141,7 @@ end
 end
 
 @inline function Fz()
-    term1 = 3 * lambda^2 / (2 * big(pi))
+    term1 = 3 * lambda^2 / (4 * big(pi))
     term2 = real(a_mie * G_factor())
     return term1 * term2 * mult_factor
 end
@@ -168,6 +153,9 @@ Fzvalues = Array{BigFloat}(undef, tam)
 global count = 0
 for z in zvalues
     global z0 = z
+    Threads.@threads for term in (-pmax+lmin):(pmax+lmax)
+        global sinint_table[term - lmin + pmax + 1] = custom_sinint(big(pi) * term + k * z0)
+    end
     global Fzvalues[count + 1] = Fz()
     if count % 100 == 0
         println(count, " pontos calculados")
@@ -180,7 +168,7 @@ z0 = 0
 fig = Figure(figure_padding=40, size= 3 .*(500, 200), fontsize = 25)
 ax1 = Axis(fig[1, 1], title = "(a)",
     xlabel = L"z \, (\mu m)", ylabel = L"Magnitude", aspect=1.5)
-ax2 = Axis(fig[1, 2], title = "(b)", yticklabelsvisible=false, yticksvisible=false,
+ax2 = Axis(fig[1, 2], title = "(b)",
     xlabel = L"z_0 \, (\mu m)", ylabel = L"F_z \, (pm^2)", aspect=1.5)
 ax_inset = Axis(fig[1, 1],
     width=Relative(0.2),
